@@ -18,7 +18,8 @@ pipeline {
             steps {
                 script {
                     echo "🔨 Building Docker image..."
-                    dockerImage = docker.build("${IMAGE_NAME}:${env.BUILD_ID}")
+                    // Đảm bảo Dockerfile có trong repo
+                    docker.build("${IMAGE_NAME}:${env.BUILD_ID}", ".")
                 }
             }
         }
@@ -27,25 +28,28 @@ pipeline {
             steps {
                 script {
                     echo "🧹 Cleaning up old container (if any)..."
-                    sh "docker stop ${CONTAINER_NAME} || true"
-                    sh "docker rm ${CONTAINER_NAME} || true"
+                    sh(script: "docker stop ${CONTAINER_NAME} || true", returnStdout: false)
+                    sh(script: "docker rm ${CONTAINER_NAME} || true", returnStdout: false)
 
                     echo "🚀 Running new container..."
-                    dockerImage.run("-d -p 5000:5000 --name ${CONTAINER_NAME}")
+                    sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${IMAGE_NAME}:${env.BUILD_ID}"
                 }
             }
         }
     }
 
     post {
+        always {
+            echo "📦 Docker Image: ${IMAGE_NAME}:${env.BUILD_ID}"
+            echo "🛑 Stopping and removing container..."
+            sh "docker stop ${CONTAINER_NAME} || true"
+            sh "docker rm ${CONTAINER_NAME} || true"
+        }
         success {
             echo '✅ CI/CD Pipeline completed successfully!'
         }
         failure {
             echo '❌ CI/CD Pipeline failed. Please check logs.'
-        }
-        always {
-            echo "📦 Docker Image: ${IMAGE_NAME}:${env.BUILD_ID}"
         }
     }
 }
