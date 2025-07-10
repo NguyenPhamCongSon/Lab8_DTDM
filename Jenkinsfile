@@ -1,55 +1,39 @@
 pipeline {
     agent any
 
-    environment {
-        IMAGE_NAME = "lab8-app"
-        CONTAINER_NAME = "lab8-app"
-    }
-
     stages {
-        stage('🧾 Checkout Source Code') {
+        stage('📥 Checkout Code') {
             steps {
-                echo "📥 Cloning source from GitHub..."
                 git branch: 'main', url: 'https://github.com/NguyenPhamCongSon/Lab8_DTDM.git'
             }
         }
 
-        stage('🐳 Build Docker Image') {
+        stage('🐳 Build Image') {
             steps {
-                script {
-                    echo "🔨 Building Docker image..."
-                    // Đảm bảo Dockerfile có trong repo
-                    docker.build("${IMAGE_NAME}:${env.BUILD_ID}", ".")
-                }
+                sh 'docker build -t lab8-app .'
             }
         }
 
-        stage('🚀 Run Docker Container') {
+        stage('🚀 Deploy') {
             steps {
                 script {
-                    echo "🧹 Cleaning up old container (if any)..."
-                    sh(script: "docker stop ${CONTAINER_NAME} || true", returnStdout: false)
-                    sh(script: "docker rm ${CONTAINER_NAME} || true", returnStdout: false)
-
-                    echo "🚀 Running new container..."
-                    sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${IMAGE_NAME}:${env.BUILD_ID}"
+                    sh 'docker stop lab8-app || true'
+                    sh 'docker rm lab8-app || true'
+                    sh 'docker run -d -p 5000:5000 --name lab8-app --restart unless-stopped lab8-app'
+                    sleep(5)
+                    sh 'curl -f http://localhost:5000 || exit 1'
                 }
             }
         }
     }
 
     post {
-        always {
-            echo "📦 Docker Image: ${IMAGE_NAME}:${env.BUILD_ID}"
-            echo "🛑 Stopping and removing container..."
-            sh "docker stop ${CONTAINER_NAME} || true"
-            sh "docker rm ${CONTAINER_NAME} || true"
-        }
         success {
-            echo '✅ CI/CD Pipeline completed successfully!'
+            echo '✅ THÀNH CÔNG: Ứng dụng đang chạy tại http://localhost:5000'
         }
         failure {
-            echo '❌ CI/CD Pipeline failed. Please check logs.'
+            sh 'docker logs lab8-app || true'
+            echo '❌ LỖI: Xem log container phía trên'
         }
     }
 }
